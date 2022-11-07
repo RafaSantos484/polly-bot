@@ -1,0 +1,27 @@
+{
+  "name": "polly-discord-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "ts-node-dev --inspect --transpile-only --ignore-watch node_modules src/server.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^18.11.9",
+    "ts-node-dev": "^2.0.0",
+    "tsconfig-paths": "^4.1.0",
+    "typescript": "^4.8.4"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.13.0",
+    "discord.js": "^14.6.0",
+    "dotenv": "^16.0.3",
+    "libsodium-wrappers": "^0.7.10",
+    "youtube.ts": "^0.2.9",
+    "ytdl-core": "^4.11.2"
+  }
+}
