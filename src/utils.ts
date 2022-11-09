@@ -11,6 +11,14 @@ export function isPlayCommand(command: string) {
   }
   return command.startsWith("@meta ") || command.startsWith("@meter ");
 }
+export function isStopCommand(command: string) {
+  command = command.toLocaleLowerCase();
+  return command === "@pare" || command === "@parar";
+}
+export function isSkipCommand(command: string) {
+  command = command.toLocaleLowerCase();
+  return command === "@pule" || command === "@pular";
+}
 
 async function getVideoThroughTitle(title: string) {
   const searchResult = await youtubeApi.videos.search({

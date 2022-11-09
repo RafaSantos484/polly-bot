@@ -1,7 +1,7 @@
 import { Client, TextChannel } from "discord.js";
 import dotenv from "dotenv";
 import YoutubeApi from "youtube.ts"; // https://www.npmjs.com/package/youtube.ts
-import { getVideo, isPlayCommand } from "./utils";
+import { getVideo, isPlayCommand, isSkipCommand, isStopCommand } from "./utils";
 import Session from "./classes/session.class";
 
 dotenv.config();
@@ -53,6 +53,12 @@ client.on("messageCreate", async (message) => {
       await session.sendMessage("Falha ao tentar obter informações do vídeo");
       return;
     }
+  } else if (isStopCommand(content)) {
+    await session.sendMessage("Parando...");
+    session.leaveVoiceChannel();
+  } else if (isSkipCommand(content)) {
+    await session.sendMessage("Pulando...");
+    session.skipVideo();
   }
 });
 
