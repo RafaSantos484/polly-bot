@@ -1,7 +1,13 @@
-import { session, youtubeApi } from "./server";
-import { Video } from "./classes/session.class";
+import { sessions, youtubeApi } from "./server";
+import ytStream from "yt-stream";
+import Session from "./classes/session.class";
 
-export function isPlayCommand(command: string) {
+export function getOrCreateSession(serverKey: string) {
+  if (!sessions[serverKey]) sessions[serverKey] = new Session();
+
+  return sessions[serverKey];
+}
+export function isPlayCommand(command: string, session: Session) {
   command = command.toLocaleLowerCase();
   if (command === "@meta" || command === "@meter") {
     session.sendMessage(
@@ -20,35 +26,30 @@ export function isSkipCommand(command: string) {
   return command === "@pule" || command === "@pular";
 }
 
-async function getVideoThroughTitle(title: string) {
+async function getStreamThroughTitle(title: string) {
   const searchResult = await youtubeApi.videos.search({
     q: title,
     maxResults: 1,
   });
-  return {
-    title: searchResult.items[0].snippet.title,
-    url: `https://www.youtube.com/watch?v=${searchResult.items[0].id.videoId}`,
-  } as Video;
+  return await ytStream.stream(
+    `https://youtu.be/${searchResult.items[0].id.videoId}`,
+    {
+      quality: "high",
+      type: "audio",
+      highWaterMark: 1048576 * 32,
+    }
+  );
 }
-export async function getVideo(command: string) {
+export async function getStream(command: string) {
   try {
-    let i = command.indexOf(" ");
-    do i++;
-    while (command[i] === " ");
-
-    const param = command.substring(i);
-    if (param.startsWith("https://youtu.be")) {
-      const videoId = param.split("/").pop();
-      const url = `https://www.youtube.com/watch?v=${videoId}`;
-      const videoInfo = await youtubeApi.videos.get(url);
-      return { title: videoInfo.snippet.title, url } as Video;
-    } else if (param.startsWith("https://www.youtube.com")) {
-      const videoInfo = await youtubeApi.videos.get(param.split("&")[0]);
-      return {
-        title: videoInfo.snippet.title,
-        url: `https://www.youtube.com/watch?v=${videoInfo.id}`,
-      } as Video;
-    } else return await getVideoThroughTitle(param);
+    const param = command.slice(command.indexOf(" ") + 1).trim();
+    return ytStream.validateVideoURL(param)
+      ? await ytStream.stream(param, {
+          quality: "high",
+          type: "audio",
+          highWaterMark: 1048576 * 32,
+        })
+      : await getStreamThroughTitle(param);
   } catch (err) {
     console.log(err);
     return null;

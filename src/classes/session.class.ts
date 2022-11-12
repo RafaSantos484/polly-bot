@@ -7,20 +7,14 @@ import {
   joinVoiceChannel,
   VoiceConnection,
 } from "@discordjs/voice";
-import ytdl from "ytdl-core";
-
-export type Video = {
-  title: string;
-  url: string;
-};
+import ytStream from "yt-stream";
 
 export default class Session {
   public currentConnection: VoiceConnection | undefined;
   public voiceChannel: VoiceBasedChannel | undefined;
   public textChannel: TextChannel | undefined;
   public player: AudioPlayer;
-  public currentVideo: Video | undefined;
-  public queue: Video[];
+  public queue: ytStream.Stream[];
 
   constructor() {
     this.queue = [];
@@ -28,32 +22,18 @@ export default class Session {
     this.player.on(AudioPlayerStatus.Idle, async () => {
       if (!this.currentConnection) return;
 
-      const newVideo = this.queue.shift();
-      if (!newVideo) {
+      const newStream = this.queue.shift();
+      if (!newStream) {
         await this.sendMessage("A fila não têm mais músicas. Vou de fuga");
         this.leaveVoiceChannel();
-      } else if (!this.playVideo(newVideo)) {
+      } else if (!(await this.playStream(newStream))) {
         await this.sendMessage("Falha ao tentar obter conexão atual", true);
         return;
       }
     });
     this.player.on("error", (err) => {
       console.log(err);
-      this.sendMessage(
-        "Falha ao tentar tocar música. Tentando tocar novamente"
-      );
-      try {
-        if (!this.currentVideo) throw new Error();
-
-        const stream = ytdl(this.currentVideo.url, {
-          filter: "audioonly",
-          begin: err.resource.playbackDuration,
-        });
-        this.player.play(createAudioResource(stream));
-        this.sendMessage("Tocando novamente");
-      } catch {
-        this.sendMessage("Falha ao tentar tocar novamente");
-      }
+      this.sendMessage("Falha ao tentar tocar música");
     });
   }
 
@@ -62,15 +42,14 @@ export default class Session {
     this.currentConnection = undefined;
     this.voiceChannel = undefined;
     this.textChannel = undefined;
-    this.currentVideo = undefined;
 
     this.player.stop();
     this.queue = [];
   }
 
   public async sendMessage(message: string, leaveVoiceChannel = false) {
-    const sentMessage = await this.textChannel?.send(message);
-    setTimeout(() => sentMessage?.delete(), 60000);
+    await this.textChannel?.send(message);
+    //setTimeout(() => sentMessage?.delete(), 60000);
     if (leaveVoiceChannel) this.leaveVoiceChannel();
   }
 
@@ -102,47 +81,39 @@ export default class Session {
     }
   }
 
-  public playVideo(video: Video) {
+  public async playStream(stream: ytStream.Stream) {
     if (!this.currentConnection) return false;
 
     try {
-      this.sendMessage(`Metendo ${video.title}`);
-      const stream = ytdl(video.url, { filter: "audioonly" });
-      this.player.play(createAudioResource(stream));
-      this.currentVideo = video;
+      this.sendMessage(`Metendo ${stream.info.title}`);
+      this.player.play(createAudioResource(stream.stream));
       return true;
     } catch (err) {
       console.log(err);
       return false;
     }
   }
-  public async pushVideo(video: Video) {
+  public async pushStream(stream: ytStream.Stream) {
     try {
       if (
         this.queue.length === 0 &&
         this.player.state.status !== AudioPlayerStatus.Playing
       ) {
-        if (this.playVideo(video))
+        if (await this.playStream(stream))
           this.currentConnection?.subscribe(this.player);
         else throw new Error();
       } else {
-        this.sendMessage(`${video.title} inserido na fila`);
-        this.queue.push(video);
+        this.sendMessage(`${stream.info.title} inserido na fila`);
+        this.queue.push(stream);
       }
       return true;
     } catch {
-      await this.sendMessage("Falha ao tentar obter conexão atual", true);
       return false;
     }
   }
-  public skipVideo() {
+  public skipStream() {
     try {
-      if (this.player.state.status !== AudioPlayerStatus.Playing) {
-        this.sendMessage("Como é que eu vou pular se nem tô tocando nada?");
-        return false;
-      } else if (!this.player.stop(true)) throw new Error();
-
-      return true;
+      return this.player.stop(true);
     } catch {
       this.sendMessage("Falha ao tentar pular música");
       return false;
