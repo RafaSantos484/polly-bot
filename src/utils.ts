@@ -7,7 +7,8 @@ export function getOrCreateSession(serverKey: string) {
 
   return sessions[serverKey];
 }
-export function isPlayCommand(command: string, session: Session) {
+
+function isPlayCommand(command: string, session: Session) {
   command = command.toLocaleLowerCase();
   if (command === "@meta" || command === "@meter") {
     session.sendMessage(
@@ -17,13 +18,25 @@ export function isPlayCommand(command: string, session: Session) {
   }
   return command.startsWith("@meta ") || command.startsWith("@meter ");
 }
-export function isStopCommand(command: string) {
+function isStopCommand(command: string) {
   command = command.toLocaleLowerCase();
   return command === "@pare" || command === "@parar";
 }
-export function isSkipCommand(command: string) {
+function isSkipCommand(command: string) {
   command = command.toLocaleLowerCase();
   return command === "@pule" || command === "@pular";
+}
+function isTDFWCommand(command: string) {
+  command = command.toLocaleLowerCase();
+  return command === "@turndownforwhat" || command === "@tdfw";
+}
+
+export function getCommandType(command: string, session: Session) {
+  if (isPlayCommand(command, session)) return "play";
+  else if (isStopCommand(command)) return "stop";
+  else if (isSkipCommand(command)) return "skip";
+  else if (isTDFWCommand(command)) return "tdfw";
+  else return undefined;
 }
 
 async function getStreamThroughTitle(title: string) {

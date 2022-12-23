@@ -1,19 +1,12 @@
 import { Client, TextChannel } from "discord.js";
 import dotenv from "dotenv";
-import {
-  getOrCreateSession,
-  getStream,
-  isPlayCommand,
-  isSkipCommand,
-  isStopCommand,
-} from "./utils";
+import { getCommandType, getOrCreateSession, getStream } from "./utils";
 import YoutubeApi from "youtube.ts";
 import Session from "./classes/session.class";
 import { AudioPlayerStatus } from "@discordjs/voice";
 
 dotenv.config();
 
-//export const youtubeApi = new YoutubeApi(process.env.GOOGLE_API_KEY);
 const client = new Client({
   intents: ["Guilds", "GuildMessages", "MessageContent", "GuildVoiceStates"],
 });
@@ -34,16 +27,19 @@ client.on("messageCreate", async (message) => {
   // its not a command of the bot
   if (!content.startsWith("@")) return;
 
-  // failed to get the voice channel
-  const voiceChannel = message.member?.voice.channel;
   const session = getOrCreateSession(message.guild.id);
   session.textChannel = message.channel as TextChannel;
+  const voiceChannel = message.member?.voice.channel;
+
+  const command = getCommandType(content, session);
+  if (!command) return;
+  // failed to get the voice channel
   if (!voiceChannel) {
     await session.sendMessage("Falha ao tentar entrar no canal de voz", true);
     return;
   }
 
-  if (isPlayCommand(content, session)) {
+  if (command === "play") {
     if (!session.voiceChannel) {
       session.voiceChannel = voiceChannel;
       const joinedChannel = session.joinVoiceChannel();
@@ -66,15 +62,40 @@ client.on("messageCreate", async (message) => {
       await session.sendMessage("Falha ao tentar obter informações do vídeo");
       return;
     }
-  } else if (isStopCommand(content)) {
+  } else if (command === "stop") {
     await session.sendMessage("Parando...");
     session.leaveVoiceChannel();
-  } else if (isSkipCommand(content)) {
+  } else if (command === "skip") {
     if (session.player.state.status !== AudioPlayerStatus.Playing) {
       session.sendMessage("Como é que eu vou pular se nem tô tocando nada?");
       return;
     }
     session.skipStream();
+  } else if (command === "tdfw") {
+    if (!session.voiceChannel) {
+      session.voiceChannel = voiceChannel;
+      const joinedChannel = session.joinVoiceChannel();
+      if (!joinedChannel) {
+        await session.sendMessage(
+          "Falha ao tentar entrar no canal de voz",
+          true
+        );
+        return;
+      }
+    }
+
+    const stream = await getStream(
+      "@meta https://www.youtube.com/watch?v=nYunsiWHydE"
+    );
+    if (stream) {
+      if (!(await session.pushStream(stream))) {
+        await session.sendMessage("Falha ao tentar inserir vídeo na fila");
+        return;
+      }
+    } else {
+      await session.sendMessage("Falha ao tentar obter informações do vídeo");
+      return;
+    }
   }
 });
 
