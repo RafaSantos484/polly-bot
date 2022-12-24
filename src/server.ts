@@ -1,6 +1,11 @@
 import { Client, TextChannel } from "discord.js";
 import dotenv from "dotenv";
-import { getCommandType, getOrCreateSession, getStream } from "./utils";
+import {
+  getCommandType,
+  getOrCreateSession,
+  getSpecialPlayCommand,
+  getStream,
+} from "./utils";
 import YoutubeApi from "youtube.ts";
 import Session from "./classes/session.class";
 import { AudioPlayerStatus } from "@discordjs/voice";
@@ -52,8 +57,12 @@ client.on("messageCreate", async (message) => {
       }
     }
 
-    const stream = await getStream(content);
+    const stream = await getStream(
+      getSpecialPlayCommand(content) || content,
+      session
+    );
     if (stream) {
+      session.currentVideoUrl = stream.info.url;
       if (!(await session.pushStream(stream))) {
         await session.sendMessage("Falha ao tentar inserir vídeo na fila");
         return;
@@ -63,39 +72,20 @@ client.on("messageCreate", async (message) => {
       return;
     }
   } else if (command === "stop") {
-    await session.sendMessage("Parando...");
-    session.leaveVoiceChannel();
+    await session.sendMessage("Parando...", true);
   } else if (command === "skip") {
     if (session.player.state.status !== AudioPlayerStatus.Playing) {
       session.sendMessage("Como é que eu vou pular se nem tô tocando nada?");
       return;
     }
     session.skipStream();
-  } else if (command === "tdfw") {
-    if (!session.voiceChannel) {
-      session.voiceChannel = voiceChannel;
-      const joinedChannel = session.joinVoiceChannel();
-      if (!joinedChannel) {
-        await session.sendMessage(
-          "Falha ao tentar entrar no canal de voz",
-          true
-        );
-        return;
-      }
-    }
-
-    const stream = await getStream(
-      "@meta https://www.youtube.com/watch?v=nYunsiWHydE"
-    );
-    if (stream) {
-      if (!(await session.pushStream(stream))) {
-        await session.sendMessage("Falha ao tentar inserir vídeo na fila");
-        return;
-      }
+  } else if (command === "toogle_loop_video") {
+    if (session.loopVideo) {
+      session.sendMessage("Desativando loop de vídeo");
     } else {
-      await session.sendMessage("Falha ao tentar obter informações do vídeo");
-      return;
+      session.sendMessage("Ativando loop de vídeo");
     }
+    session.loopVideo = !session.loopVideo;
   }
 });
 

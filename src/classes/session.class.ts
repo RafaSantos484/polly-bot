@@ -8,6 +8,7 @@ import {
   VoiceConnection,
 } from "@discordjs/voice";
 import ytStream from "yt-stream";
+import { getStream } from "../utils";
 
 export default class Session {
   public currentConnection: VoiceConnection | undefined;
@@ -15,20 +16,42 @@ export default class Session {
   public textChannel: TextChannel | undefined;
   public player: AudioPlayer;
   public queue: ytStream.Stream[];
+  public currentVideoUrl: string;
+  public loopVideo: boolean;
 
   constructor() {
     this.queue = [];
+    this.currentVideoUrl = "";
+    this.loopVideo = false;
     this.player = createAudioPlayer();
+
     this.player.on(AudioPlayerStatus.Idle, async () => {
       if (!this.currentConnection) return;
 
-      const newStream = this.queue.shift();
-      if (!newStream) {
-        await this.sendMessage("A fila não têm mais músicas. Vou de fuga");
-        this.leaveVoiceChannel();
-      } else if (!(await this.playStream(newStream))) {
-        await this.sendMessage("Falha ao tentar obter conexão atual", true);
+      if (this.loopVideo) {
+        const stream = await getStream(`@meta ${this.currentVideoUrl}`, this);
+        if (!stream) {
+          await this.sendMessage(
+            "Falha ao tentar obter informações do vídeo",
+            true
+          );
+          return;
+        }
+        if (!(await this.playStream(stream)))
+          await this.sendMessage("Falha ao tentar obter conexão atual", true);
+
         return;
+      }
+
+      const nextStream = this.queue.shift();
+      this.currentVideoUrl = nextStream?.info.url || "";
+      if (!nextStream) {
+        await this.sendMessage(
+          "A fila não têm mais músicas. Vou de fuga",
+          true
+        );
+      } else if (!(await this.playStream(nextStream))) {
+        await this.sendMessage("Falha ao tentar obter conexão atual", true);
       }
     });
     this.player.on("error", (err) => {
@@ -42,6 +65,7 @@ export default class Session {
     this.currentConnection = undefined;
     this.voiceChannel = undefined;
     this.textChannel = undefined;
+    this.currentVideoUrl = "";
 
     this.player.stop();
     this.queue = [];
@@ -85,6 +109,7 @@ export default class Session {
     if (!this.currentConnection) return false;
 
     try {
+      this.currentVideoUrl = stream.info.url;
       this.sendMessage(`Metendo ${stream.info.title}`);
       this.player.play(createAudioResource(stream.stream));
       return true;

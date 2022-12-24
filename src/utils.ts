@@ -16,7 +16,11 @@ function isPlayCommand(command: string, session: Session) {
     );
     return false;
   }
-  return command.startsWith("@meta ") || command.startsWith("@meter ");
+  return (
+    command.startsWith("@meta ") ||
+    command.startsWith("@meter ") ||
+    !!getSpecialPlayCommand(command)
+  );
 }
 function isStopCommand(command: string) {
   command = command.toLocaleLowerCase();
@@ -26,16 +30,28 @@ function isSkipCommand(command: string) {
   command = command.toLocaleLowerCase();
   return command === "@pule" || command === "@pular";
 }
-function isTDFWCommand(command: string) {
+function isToogleLoopVideoCommand(command: string) {
   command = command.toLocaleLowerCase();
-  return command === "@turndownforwhat" || command === "@tdfw";
+  return command === "@loop_video";
+}
+
+export function getSpecialPlayCommand(command: string) {
+  if (command === "@tdfw")
+    return "@meta https://www.youtube.com/watch?v=nYunsiWHydE";
+  else if (command === "@hamood")
+    return "@meta https://www.youtube.com/watch?v=YBS8rJvxnKo";
+  else if (command === "@mbappe")
+    return "@meta https://www.youtube.com/watch?v=ohSQhK5rw8s";
+  else if (command === "@outside")
+    return "@meta https://www.youtube.com/watch?v=dh7IHyQXT1Y";
+  else return undefined;
 }
 
 export function getCommandType(command: string, session: Session) {
   if (isPlayCommand(command, session)) return "play";
   else if (isStopCommand(command)) return "stop";
   else if (isSkipCommand(command)) return "skip";
-  else if (isTDFWCommand(command)) return "tdfw";
+  else if (isToogleLoopVideoCommand(command)) return "toogle_loop_video";
   else return undefined;
 }
 
@@ -53,7 +69,7 @@ async function getStreamThroughTitle(title: string) {
     }
   );
 }
-export async function getStream(command: string) {
+export async function getStream(command: string, session: Session) {
   try {
     const param = command.slice(command.indexOf(" ") + 1).trim();
     return ytStream.validateVideoURL(param)
@@ -65,6 +81,11 @@ export async function getStream(command: string) {
       : await getStreamThroughTitle(param);
   } catch (err) {
     console.log(err);
+    if (err === "Age restricted video") {
+      await session.sendMessage(
+        "Não posso tocar vídeos com restrição de idade"
+      );
+    }
     return null;
   }
 }
