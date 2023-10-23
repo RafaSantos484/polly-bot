@@ -3,7 +3,6 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import { joinVoiceChannel } from "@discordjs/voice";
 import playDl from "play-dl";
 
 import { client } from "..";
@@ -80,7 +79,7 @@ const command = {
     const inputType = await playDl.validate(input);
     switch (inputType) {
       case false:
-        await interaction.reply("Input inválido");
+        await interaction.editReply("Input inválido");
         return;
       case "yt_video":
         server.playYoutubeUrl(input, interaction);
@@ -105,7 +104,7 @@ const command = {
         break;
       default:
         console.log(input, inputType);
-        await interaction.reply("Não consigo processar esse tipo de input");
+        await interaction.editReply("Não consigo processar esse tipo de input");
         return;
     }
   },

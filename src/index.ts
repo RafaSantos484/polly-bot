@@ -9,6 +9,7 @@ import Server from "./classes/server.class";
 import pingCommand from "./commands/ping";
 import playCommand from "./commands/play";
 import stopCommand from "./commands/stop";
+import skipCommand from "./commands/skip";
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ export const client = new Client({
 client.commands.set(pingCommand.data.name, pingCommand);
 client.commands.set(playCommand.data.name, playCommand);
 client.commands.set(stopCommand.data.name, stopCommand);
+client.commands.set(skipCommand.data.name, skipCommand);
 
 client.once("ready", () => {
   console.log(`Logged as ${client.user?.tag}`);
