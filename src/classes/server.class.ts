@@ -10,8 +10,7 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import { exec } from "youtube-dl-exec";
-import { Readable, Transform } from "stream";
+import playDl from "play-dl";
 
 export default class Server {
   queue: string[];
@@ -36,7 +35,13 @@ export default class Server {
         return;
       }
 
-      this.play(nextVideo);
+      const videoInfo = await playDl.video_info(nextVideo);
+      const { title } = videoInfo.video_details;
+      const stream = await playDl.stream_from_info(videoInfo);
+      this.sendMessage(`Metendo ${title}`);
+      this.player.play(
+        createAudioResource(stream.stream, { inputType: stream.type })
+      );
     });
     this.player.on("error", async (err) => {
       console.error(err.message);
@@ -83,39 +88,28 @@ export default class Server {
   ) {
     if (!this.connection) return;
 
+    // TODO: validar input
     if (
       this.queue.length === 0 &&
       this.player.state.status !== AudioPlayerStatus.Playing &&
       this.player.state.status !== AudioPlayerStatus.Buffering
     ) {
       //const stream = ytdl(input, { filter: "audioonly" });
-      const video = exec(input, { output: "-" });
-      const { stdout } = video;
-      if (!stdout) {
-        await (interaction
-          ? interaction.reply(`Falha ao tentar tocar ${input}`)
-          : this.sendMessage(`Falha ao tentar tocar ${input}`));
-        return;
-      }
+      const videoInfo = await playDl.video_info(input);
+      const { title } = videoInfo.video_details;
+      const stream = await playDl.stream_from_info(videoInfo);
 
-      const stream = new Readable();
-      stream._read = () => {};
-      const streamTransformer = new Transform({
-        transform(chunk, encoding, callback) {
-          stream.push(chunk); // Write data in Readable object
-          callback();
-        },
-      });
-      stdout.pipe(streamTransformer);
-      this.player.play(createAudioResource(stream));
+      this.player.play(
+        createAudioResource(stream.stream, { inputType: stream.type })
+      );
       await (interaction
-        ? interaction.reply(`Metendo ${input}`)
-        : this.sendMessage(`Metendo ${input}`));
+        ? interaction.reply(`Metendo ${title}`)
+        : this.sendMessage(`Metendo ${title}`));
     } else {
       this.queue.push(input);
       await (interaction
-        ? interaction.reply(`${input} inserido na fila`)
-        : this.sendMessage(`${input} inserido na fila`));
+        ? interaction.reply("Vídeo inserido na fila")
+        : this.sendMessage("Vídeo inserido na fila"));
     }
   }
 }
