@@ -10,7 +10,8 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import ytdl from "ytdl-core";
+import { exec } from "youtube-dl-exec";
+import { Readable, Transform } from "stream";
 
 export default class Server {
   queue: string[];
@@ -36,6 +37,12 @@ export default class Server {
       }
 
       this.play(nextVideo);
+    });
+    this.player.on("error", async (err) => {
+      console.error(err.message);
+      console.error(err.resource);
+      await this.sendMessage("Deu ruim", true);
+      this.disconnect();
     });
   }
 
@@ -81,7 +88,25 @@ export default class Server {
       this.player.state.status !== AudioPlayerStatus.Playing &&
       this.player.state.status !== AudioPlayerStatus.Buffering
     ) {
-      const stream = ytdl(input, { filter: "audioonly" });
+      //const stream = ytdl(input, { filter: "audioonly" });
+      const video = exec(input, { output: "-" });
+      const { stdout } = video;
+      if (!stdout) {
+        await (interaction
+          ? interaction.reply(`Falha ao tentar tocar ${input}`)
+          : this.sendMessage(`Falha ao tentar tocar ${input}`));
+        return;
+      }
+
+      const stream = new Readable();
+      stream._read = () => {};
+      const streamTransformer = new Transform({
+        transform(chunk, encoding, callback) {
+          stream.push(chunk); // Write data in Readable object
+          callback();
+        },
+      });
+      stdout.pipe(streamTransformer);
       this.player.play(createAudioResource(stream));
       await (interaction
         ? interaction.reply(`Metendo ${input}`)
