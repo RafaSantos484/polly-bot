@@ -10,7 +10,7 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import playDl from "play-dl";
+import playDl, { YouTubeVideo, InfoData } from "play-dl";
 
 export default class Server {
   queue: string[];
@@ -83,8 +83,9 @@ export default class Server {
   }
 
   async play(
-    input: string,
-    interaction?: ChatInputCommandInteraction<CacheType>
+    youtubeUrl: string,
+    interaction?: ChatInputCommandInteraction<CacheType>,
+    title?: string
   ) {
     if (!this.connection) return;
 
@@ -95,20 +96,20 @@ export default class Server {
       this.player.state.status !== AudioPlayerStatus.Buffering
     ) {
       //const stream = ytdl(input, { filter: "audioonly" });
-      const videoInfo = await playDl.video_info(input);
-      const { title } = videoInfo.video_details;
-      const stream = await playDl.stream_from_info(videoInfo);
+      title =
+        title || (await playDl.video_info(youtubeUrl)).video_details.title;
+      const stream = await playDl.stream(youtubeUrl);
 
       this.player.play(
         createAudioResource(stream.stream, { inputType: stream.type })
       );
       await (interaction
-        ? interaction.reply(`Metendo ${title}`)
+        ? interaction.editReply(`Metendo ${title}`)
         : this.sendMessage(`Metendo ${title}`));
     } else {
-      this.queue.push(input);
+      this.queue.push(youtubeUrl);
       await (interaction
-        ? interaction.reply("Vídeo inserido na fila")
+        ? interaction.editReply("Vídeo inserido na fila")
         : this.sendMessage("Vídeo inserido na fila"));
     }
   }
