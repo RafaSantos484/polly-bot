@@ -56,9 +56,24 @@ const command = {
 
     // After 3s 'reply' method is no longer avaible
     // 'ephemeral: true' grants that the bot can reply after 3s
-    await interaction.deferReply({ ephemeral: true });
+    //await interaction.deferReply({ ephemeral: true });
+    await interaction.reply("Processando...");
     const server = client.servers[serverId];
     server.textChannel = interaction.channel;
+
+    const connected = await server.connect(
+      voiceChannel.id,
+      guild.id,
+      guild.voiceAdapterCreator
+    );
+    if (!connected) {
+      await server.sendMessage(
+        `Falha ao tentar entrar no canal ${voiceChannel.name}`,
+        true,
+        interaction
+      );
+      return;
+    }
 
     let url = "";
     let title: string | undefined;
@@ -68,34 +83,31 @@ const command = {
         await interaction.reply("Input inválido");
         return;
       case "yt_video":
-        url = input;
+        server.playYoutubeUrl(input, interaction);
+        break;
+      case "yt_playlist":
+        const playlistInfo = await playDl.playlist_info(input, {
+          incomplete: true,
+        });
+
+        server.playYoutubePlaylist(
+          playlistInfo,
+          interaction,
+          playlistInfo.title
+        );
         break;
       case "search":
         const searchResult = (await playDl.search(input, { limit: 1 }))[0];
         title = searchResult.title;
         url = searchResult.url;
+
+        server.playYoutubeUrl(url, interaction, title);
         break;
       default:
         console.log(input, inputType);
         await interaction.reply("Não consigo processar esse tipo de input");
         return;
     }
-
-    if (!server.isConnected()) {
-      server.setConnection(
-        joinVoiceChannel({
-          channelId: voiceChannel.id,
-          guildId: guild.id,
-          adapterCreator: guild.voiceAdapterCreator,
-        })
-      );
-      if (!server.subscribePlayer()) {
-        server.disconnect();
-        await interaction.reply("Falha ao tentar tocar");
-        return;
-      }
-    }
-    server.play(url, interaction, title);
   },
 };
 

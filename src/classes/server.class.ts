@@ -4,13 +4,14 @@ import {
   VoiceConnection,
   createAudioPlayer,
   createAudioResource,
+  joinVoiceChannel,
 } from "@discordjs/voice";
 import {
   TextBasedChannel,
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import playDl, { YouTubeVideo, InfoData } from "play-dl";
+import playDl, { YouTubePlayList } from "play-dl";
 
 export default class Server {
   queue: string[];
@@ -51,18 +52,47 @@ export default class Server {
     });
   }
 
+  async connect(
+    voiceChannelId: string,
+    guildId: string,
+    voiceAdapterCreator: any,
+    interaction?: ChatInputCommandInteraction<CacheType>
+  ) {
+    if (
+      !this.connection ||
+      this.connection.joinConfig.channelId !== voiceChannelId
+    ) {
+      this.setConnection(
+        joinVoiceChannel({
+          channelId: voiceChannelId,
+          guildId,
+          adapterCreator: voiceAdapterCreator,
+        })
+      );
+      if (!this.subscribePlayer()) {
+        this.disconnect();
+        await this.sendMessage("Falha ao tentar tocar", true, interaction);
+        return false;
+      }
+    }
+    return true;
+  }
   disconnect() {
+    const { connection } = this;
+    this.connection = undefined;
     this.queue = [];
     this.player.stop(true);
-    if (this.connection) {
-      //this.connection.disconnect();
-      this.connection.destroy();
-      this.connection = undefined;
-    }
+    connection?.destroy();
   }
 
-  async sendMessage(message: string, disconnect = false) {
-    await this.textChannel?.send(message);
+  async sendMessage(
+    message: string,
+    disconnect = false,
+    interaction?: ChatInputCommandInteraction<CacheType>
+  ) {
+    await (interaction
+      ? interaction.editReply(message)
+      : this.textChannel?.send(message));
     //setTimeout(() => sentMessage?.delete(), 60000);
     if (disconnect) this.disconnect();
   }
@@ -81,8 +111,15 @@ export default class Server {
     }
     return false;
   }
+  isIdle() {
+    return (
+      this.queue.length === 0 &&
+      this.player.state.status !== AudioPlayerStatus.Playing &&
+      this.player.state.status !== AudioPlayerStatus.Buffering
+    );
+  }
 
-  async play(
+  async playYoutubeUrl(
     youtubeUrl: string,
     interaction?: ChatInputCommandInteraction<CacheType>,
     title?: string
@@ -90,11 +127,11 @@ export default class Server {
     if (!this.connection) return;
 
     // TODO: validar input
-    if (
-      this.queue.length === 0 &&
-      this.player.state.status !== AudioPlayerStatus.Playing &&
-      this.player.state.status !== AudioPlayerStatus.Buffering
-    ) {
+    if (this.isIdle()) {
+      if (interaction) {
+        await interaction.editReply("Metendo");
+      }
+
       //const stream = ytdl(input, { filter: "audioonly" });
       title =
         title || (await playDl.video_info(youtubeUrl)).video_details.title;
@@ -103,14 +140,36 @@ export default class Server {
       this.player.play(
         createAudioResource(stream.stream, { inputType: stream.type })
       );
-      await (interaction
-        ? interaction.editReply(`Metendo ${title}`)
-        : this.sendMessage(`Metendo ${title}`));
+      if (title) {
+        this.sendMessage(`Metendo ${title}`, false, interaction);
+      }
     } else {
       this.queue.push(youtubeUrl);
-      await (interaction
-        ? interaction.editReply("Vídeo inserido na fila")
-        : this.sendMessage("Vídeo inserido na fila"));
+      this.sendMessage("Vídeo inserido na fila", false, interaction);
+    }
+  }
+  async playYoutubePlaylist(
+    youtubePlaylist: YouTubePlayList,
+    interaction?: ChatInputCommandInteraction<CacheType>,
+    title?: string
+  ) {
+    if (!this.connection) return;
+
+    const videos = await youtubePlaylist.all_videos();
+    if (this.isIdle()) {
+      const nextVideo = videos.shift();
+      if (!nextVideo) return;
+
+      await this.sendMessage(`Metendo playlist ${title}`, false, interaction);
+      await this.playYoutubeUrl(nextVideo.url, undefined, nextVideo.title);
+      this.queue = this.queue.concat(videos.map((video) => video.url));
+    } else {
+      this.queue = this.queue.concat(videos.map((video) => video.url));
+      this.sendMessage(
+        `Playlist ${title} inserida na fila`,
+        false,
+        interaction
+      );
     }
   }
 }
