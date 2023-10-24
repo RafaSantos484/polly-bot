@@ -103,7 +103,7 @@ export default class Server {
     connection?.destroy();
   }
 
-  pushToQueue(url: string, title?: string, urlType: UrlType = "youtube") {
+  pushToQueue(url: string, urlType: UrlType, title?: string) {
     this.queue.push({ url, title, urlType });
   }
 
@@ -190,7 +190,7 @@ export default class Server {
       );
       this.sendMessage(`Metendo ${title}`, false, interaction);
     } else {
-      this.pushToQueue(url, title);
+      this.pushToQueue(url, urlType, title);
       this.sendMessage("Vídeo inserido na fila", false, interaction);
     }
   }
