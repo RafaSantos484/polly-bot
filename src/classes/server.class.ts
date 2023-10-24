@@ -34,7 +34,7 @@ export default class Server {
     this.player = createAudioPlayer();
 
     this.player.on(AudioPlayerStatus.Idle, async () => {
-      if (!this.connection) return;
+      /*if (!this.connection) return;
 
       const nextVideo = this.queue.shift();
       if (!nextVideo) {
@@ -60,11 +60,12 @@ export default class Server {
       this.sendMessage(`Metendo ${title}`);
       this.player.play(
         createAudioResource(stream.stream, { inputType: stream.type })
-      );
+      );*/
+      this.playNextUrlOnQueue();
     });
     this.player.on("error", async (err) => {
       console.error(err.message);
-      await this.sendMessage("Erro enquanto estava tocando vídeo", true);
+      await this.sendMessage("Rolou um erro enquanto estava tocando vídeo");
       await this.playNextUrlOnQueue();
     });
   }

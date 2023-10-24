@@ -97,7 +97,7 @@ const command = {
         break;
       case "sp_playlist":
         const spotifyPlaylistInfo = await spotify.getPlaylistInfoFromUrl(input);
-        server.playPlaylist(spotifyPlaylistInfo);
+        server.playPlaylist(spotifyPlaylistInfo, interaction);
         break;
       case "search":
         //const searchResult = (await playDl.search(input, { limit: 1 }))[0];

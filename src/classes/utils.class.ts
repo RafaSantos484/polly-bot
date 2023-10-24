@@ -19,9 +19,9 @@ export default class Utils {
     }
   }
 
-  static async getStream(url: string) {
+  static async getStream(youtubeStream: string) {
     try {
-      return await stream(url);
+      return await stream(youtubeStream);
     } catch (err: any) {
       if (err.toString().includes("Sign in to confirm your age")) {
         throw "Não posso tocar vídeos com restrição de idade";
