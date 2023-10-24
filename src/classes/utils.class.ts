@@ -7,7 +7,7 @@ export default class Utils {
   ) {
     try {
       if (inputType === "search") {
-        return (await search(query, { limit: 1 }))[0];
+        return (await search(`audio ${query}`, { limit: 1 }))[0];
       } else {
         // inputType === "url"
         return (await video_basic_info(query)).video_details;

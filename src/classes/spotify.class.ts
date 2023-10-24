@@ -94,7 +94,6 @@ export default class Spotify {
         search = "";
       }
 
-      console.log(playlistInfo);
       return playlistInfo;
     } catch (err) {
       console.log(err);

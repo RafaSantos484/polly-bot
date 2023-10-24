@@ -16,10 +16,11 @@ import Utils from "./utils.class";
 import { spotify } from "..";
 import { SpotifyPlaylistTracksSearch } from "./spotify.class";
 
-type srcType = "youtubeUrl" | "spotifyUrl" | "spotifySearch";
+type SrcType = "youtubeUrl" | "spotifyUrl" | "search";
+type Queue = Array<{ src: string; srcType: SrcType; title?: string }>;
 
 export default class Server {
-  queue: Array<{ src: string; srcType: srcType; title?: string }>;
+  queue: Queue;
   textChannel: TextBasedChannel | null;
   private connection: VoiceConnection | undefined;
   player: AudioPlayer;
@@ -30,33 +31,6 @@ export default class Server {
     this.player = createAudioPlayer();
 
     this.player.on(AudioPlayerStatus.Idle, async () => {
-      /*if (!this.connection) return;
-
-      const nextVideo = this.queue.shift();
-      if (!nextVideo) {
-        await this.sendMessage(
-          "A fila não têm mais músicas. Vou de fuga",
-          true
-        );
-        return;
-      }
-
-      let stream: YouTubeStream | SoundCloudStream;
-      try {
-        stream = await Utils.getStream(nextVideo.url);
-      } catch (err: any) {
-        await this.sendMessage(err);
-        await this.playNextUrlOnQueue();
-        return;
-      }
-
-      const title =
-        nextVideo.title ||
-        (await playDl.video_info(nextVideo.url)).video_details;
-      this.sendMessage(`Metendo ${title}`);
-      this.player.play(
-        createAudioResource(stream.stream, { inputType: stream.type })
-      );*/
       this.playNextUrlOnQueue();
     });
     this.player.on("error", async (err) => {
@@ -99,7 +73,7 @@ export default class Server {
     connection?.destroy();
   }
 
-  pushToQueue(src: string, srcType: srcType, title?: string) {
+  pushToQueue(src: string, srcType: SrcType, title?: string) {
     this.queue.push({ src, title, srcType });
   }
 
@@ -153,7 +127,7 @@ export default class Server {
   }
   async playSrc(
     src: string,
-    srcType: srcType,
+    srcType: SrcType,
     interaction?: ChatInputCommandInteraction<CacheType>,
     title?: string,
     playNow = false
@@ -163,9 +137,9 @@ export default class Server {
     if (this.isIdle() || playNow) {
       let stream: YouTubeStream | SoundCloudStream;
       try {
-        if (srcType === "spotifyUrl" || srcType === "spotifySearch") {
+        if (srcType === "spotifyUrl" || srcType === "search") {
           const search =
-            srcType === "spotifySearch"
+            srcType === "search"
               ? src
               : await spotify.getTrackSearchFromUrl(src);
           const searchResult = await Utils.getYoutubeVideoInfo(
@@ -202,7 +176,7 @@ export default class Server {
 
     //const tracks = await playlist.all_tracks();
     const title = playlist.title;
-    let mappedTracks: any[];
+    let mappedTracks: Queue;
     if (playlist instanceof YouTubePlayList) {
       const tracks = await playlist.all_videos();
       mappedTracks = tracks.map((track) => ({
@@ -213,7 +187,7 @@ export default class Server {
     } else {
       mappedTracks = playlist.tracksSearch.map((search) => ({
         src: search,
-        srcType: "spotifySearch",
+        srcType: "search",
       }));
     }
 
