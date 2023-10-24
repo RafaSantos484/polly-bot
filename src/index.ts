@@ -10,6 +10,7 @@ import pingCommand from "./commands/ping";
 import playCommand from "./commands/play";
 import stopCommand from "./commands/stop";
 import skipCommand from "./commands/skip";
+import Spotify from "./classes/spotify.class";
 
 dotenv.config();
 
@@ -20,6 +21,8 @@ if (!TOKEN || !APP_ID) {
   console.log("Missing secrets in .env");
   exit(1);
 }
+
+export const spotfy = new Spotify();
 
 export const client = new Client({
   intents: ["Guilds", "GuildMessages", "MessageContent", "GuildVoiceStates"],
@@ -97,7 +100,7 @@ const rest = new REST().setToken(TOKEN);
 client.login(TOKEN);
 
 // Only useful for keeping render server running
-const app = express();
+export const app = express();
 const port = process.env.PORT || 5900;
 
 app.head("/", (_req, res) => {

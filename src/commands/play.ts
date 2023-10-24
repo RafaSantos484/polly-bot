@@ -5,7 +5,7 @@ import {
 } from "discord.js";
 import playDl, { YouTubeVideo, search } from "play-dl";
 
-import { client } from "..";
+import { client, spotfy } from "..";
 import Utils from "../classes/utils.class";
 
 const command = {
@@ -22,7 +22,7 @@ const command = {
     interaction: ChatInputCommandInteraction<CacheType>,
     serverId: string
   ) => {
-    const input = interaction.options.get("input")?.value;
+    let input = interaction.options.get("input")?.value;
     if (typeof input !== "string") {
       await interaction.reply("Meta um input válido");
       return;
@@ -77,7 +77,7 @@ const command = {
 
     let url = "";
     let title: string | undefined;
-    const inputType = await playDl.validate(input);
+    let inputType = await playDl.validate(input);
     switch (inputType) {
       case false:
         await interaction.editReply("Input inválido");
@@ -90,19 +90,22 @@ const command = {
           incomplete: true,
         });
 
-        server.playYoutubePlaylist(
-          playlistInfo,
-          interaction,
-          playlistInfo.title
-        );
+        server.playPlaylist(playlistInfo, interaction, playlistInfo.title);
         break;
+      case "sp_track":
+        try {
+          input = await spotfy.getTrackSearch(input);
+        } catch (err: any) {
+          await server.sendMessage(err, false, interaction);
+          return;
+        }
       case "search":
         //const searchResult = (await playDl.search(input, { limit: 1 }))[0];
         let searchResult: YouTubeVideo;
         try {
           searchResult = await Utils.getYoutubeVideoInfo(input, "search");
         } catch (err: any) {
-          await server.sendMessage(err, false, interaction);search
+          await server.sendMessage(err, false, interaction);
           return;
         }
 
