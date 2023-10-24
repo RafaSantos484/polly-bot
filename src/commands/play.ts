@@ -98,7 +98,13 @@ const command = {
         break;
       case "search":
         //const searchResult = (await playDl.search(input, { limit: 1 }))[0];
-        const searchResult = await Utils.getYoutubeVideoInfo(input, "search");
+        let searchResult: YouTubeVideo;
+        try {
+          searchResult = await Utils.getYoutubeVideoInfo(input, "search");
+        } catch (err: any) {
+          await server.sendMessage(err, false, interaction);search
+          return;
+        }
 
         title = searchResult.title;
         url = searchResult.url;

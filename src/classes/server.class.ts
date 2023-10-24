@@ -151,9 +151,9 @@ export default class Server {
       //await interaction?.editReply("Metendo");
 
       //const stream = ytdl(input, { filter: "audioonly" });
-      title = title || (await Utils.getYoutubeVideoInfo(youtubeUrl)).title;
       let stream: YouTubeStream | SoundCloudStream;
       try {
+        title = title || (await Utils.getYoutubeVideoInfo(youtubeUrl)).title;
         stream = await Utils.getStream(youtubeUrl);
       } catch (err: any) {
         await this.sendMessage(err, false, interaction);
