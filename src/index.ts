@@ -22,7 +22,7 @@ if (!TOKEN || !APP_ID) {
   exit(1);
 }
 
-export const spotfy = new Spotify();
+export const spotify = new Spotify();
 
 export const client = new Client({
   intents: ["Guilds", "GuildMessages", "MessageContent", "GuildVoiceStates"],

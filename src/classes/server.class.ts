@@ -13,12 +13,14 @@ import {
 } from "discord.js";
 import playDl, {
   SoundCloudStream,
+  SpotifyPlaylist,
   YouTubePlayList,
   YouTubeStream,
 } from "play-dl";
 import Utils from "./utils.class";
+import { spotify } from "..";
 
-type UrlType = "youtube" | "spotfy";
+type UrlType = "youtube" | "spotify";
 
 export default class Server {
   queue: Array<{ url: string; urlType: UrlType; title?: string }>;
@@ -139,31 +141,43 @@ export default class Server {
   }
 
   private async playNextUrlOnQueue() {
-    const nextVideo = this.queue.shift();
-    if (nextVideo) {
-      await this.playYoutubeUrl(
-        nextVideo.url,
+    const nextTrack = this.queue.shift();
+    if (nextTrack) {
+      await this.playUrl(
+        nextTrack.url,
         undefined,
-        nextVideo.title,
-        true
+        nextTrack.title,
+        true,
+        nextTrack.urlType
       );
     } else {
       await this.sendMessage("A fila não têm mais músicas. Vou de fuga", true);
     }
   }
-  async playYoutubeUrl(
-    youtubeUrl: string,
+  async playUrl(
+    url: string,
     interaction?: ChatInputCommandInteraction<CacheType>,
     title?: string,
-    playNow = false
+    playNow = false,
+    urlType: UrlType = "youtube"
   ) {
     if (!this.connection) return;
 
     if (this.isIdle() || playNow) {
       let stream: YouTubeStream | SoundCloudStream;
       try {
-        title = title || (await Utils.getYoutubeVideoInfo(youtubeUrl)).title;
-        stream = await Utils.getStream(youtubeUrl);
+        if (urlType === "spotify") {
+          const search = await spotify.getTrackSearchFromUrl(url);
+          const searchResult = await Utils.getYoutubeVideoInfo(
+            search,
+            "search"
+          );
+          title = searchResult.title || "";
+          url = searchResult.url;
+        }
+
+        title = title || (await Utils.getYoutubeVideoInfo(url)).title;
+        stream = await Utils.getStream(url);
       } catch (err: any) {
         await this.sendMessage(err, false, interaction);
         await this.playNextUrlOnQueue();
@@ -175,35 +189,43 @@ export default class Server {
       );
       this.sendMessage(`Metendo ${title}`, false, interaction);
     } else {
-      this.pushToQueue(youtubeUrl);
+      this.pushToQueue(url, title);
       this.sendMessage("Vídeo inserido na fila", false, interaction);
     }
   }
+
   async playPlaylist(
-    youtubePlaylist: YouTubePlayList,
-    interaction?: ChatInputCommandInteraction<CacheType>,
-    title?: string,
-    type: UrlType = "youtube"
+    playlist: YouTubePlayList | SpotifyPlaylist,
+    interaction?: ChatInputCommandInteraction<CacheType>
   ) {
     if (!this.connection) return;
 
-    const videos = await youtubePlaylist.all_videos();
-    if (this.isIdle()) {
-      this.queue = videos.map((video) => ({
-        url: video.url,
-        title: video.title,
-        urlType: type,
+    //const tracks = await playlist.all_tracks();
+    let title: string | undefined;
+    let mappedTracks: any[];
+    if (playlist instanceof YouTubePlayList) {
+      title = playlist.title;
+      const tracks = await playlist.all_videos();
+      mappedTracks = tracks.map((track) => ({
+        url: track.url,
+        title: track.title,
+        urlType: "youtube",
       }));
+    } else {
+      title = playlist.name;
+      const tracks = await playlist.all_tracks();
+      mappedTracks = tracks.map((track) => ({
+        url: track.url,
+        title: track.name,
+        urlType: "spotify",
+      }));
+    }
+    if (this.isIdle()) {
+      this.queue = mappedTracks;
       await this.sendMessage(`Metendo playlist ${title}`, false, interaction);
       await this.playNextUrlOnQueue();
     } else {
-      this.queue = this.queue.concat(
-        videos.map((video) => ({
-          url: video.url,
-          title: video.title,
-          urlType: type,
-        }))
-      );
+      this.queue = this.queue.concat(mappedTracks);
       this.sendMessage(
         `Playlist ${title} inserida na fila`,
         false,

@@ -3,9 +3,9 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import playDl, { YouTubeVideo, search } from "play-dl";
+import playDl, { YouTubeVideo } from "play-dl";
 
-import { client, spotfy } from "..";
+import { client, spotify } from "..";
 import Utils from "../classes/utils.class";
 
 const command = {
@@ -83,22 +83,22 @@ const command = {
         await interaction.editReply("Input inválido");
         return;
       case "yt_video":
-        server.playYoutubeUrl(input, interaction);
+        server.playUrl(input, interaction);
+        break;
+      case "sp_track":
+        server.playUrl(input, interaction, undefined, false, "spotify");
         break;
       case "yt_playlist":
         const playlistInfo = await playDl.playlist_info(input, {
           incomplete: true,
         });
 
-        server.playPlaylist(playlistInfo, interaction, playlistInfo.title);
+        server.playPlaylist(playlistInfo, interaction);
         break;
-      case "sp_track":
-        try {
-          input = await spotfy.getTrackSearch(input);
-        } catch (err: any) {
-          await server.sendMessage(err, false, interaction);
-          return;
-        }
+      case "sp_playlist":
+        const spotifyPlaylistInfo = await spotify.getPlaylistInfoFromUrl(input);
+        server.playPlaylist(spotifyPlaylistInfo);
+        break;
       case "search":
         //const searchResult = (await playDl.search(input, { limit: 1 }))[0];
         let searchResult: YouTubeVideo;
@@ -112,7 +112,7 @@ const command = {
         title = searchResult.title;
         url = searchResult.url;
 
-        server.playYoutubeUrl(url, interaction, title);
+        server.playUrl(url, interaction, title);
         break;
       default:
         console.log(input, inputType);

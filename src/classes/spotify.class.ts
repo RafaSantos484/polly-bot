@@ -1,6 +1,6 @@
 import axios from "axios";
 import dotenv from "dotenv";
-import { SpotifyTrack } from "play-dl";
+import { SpotifyPlaylist, SpotifyTrack } from "play-dl";
 
 dotenv.config();
 
@@ -11,11 +11,6 @@ const Authorization = `Basic ${Buffer.from(
 export default class Spotify {
   private accessToken: string | undefined;
   private tokenGenerationTime: Date | undefined;
-
-  constructor() {
-    this.accessToken = undefined;
-    this.tokenGenerationTime = undefined;
-  }
 
   private async getAccessToken() {
     if (!this.isAccessTokenExpired()) return this.accessToken;
@@ -47,7 +42,7 @@ export default class Spotify {
     return new URL(trackUrl).pathname.split("/").pop();
   }
 
-  async getTrackSearch(trackUrl: string) {
+  async getTrackSearchFromUrl(trackUrl: string) {
     const token = await this.getAccessToken();
     const trackId = this.getTrackIdFromUrl(trackUrl);
     if (!trackId) throw "Falha ao tentar processar URL da faixa do Spotify";
@@ -65,6 +60,28 @@ export default class Spotify {
     } catch (err) {
       console.log(err);
       throw "Falha ao tentar obter informações da faixa do Spotify";
+    }
+  }
+
+  async getPlaylistInfoFromUrl(playlistUrl: string) {
+    const token = await this.getAccessToken();
+    const playlistId = this.getTrackIdFromUrl(playlistUrl);
+    if (!playlistId)
+      throw "Falha ao tentar processar URL da playlist do Spotify";
+
+    try {
+      const res = await axios.get(
+        `https://api.spotify.com/v1/playlists/${playlistId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return new SpotifyPlaylist(
+        res.data,
+        { client_id: "", client_secret: "" },
+        false
+      );
+    } catch (err) {
+      console.log(err);
+      throw "Falha ao tentar obter informações da playlist do Spotify";
     }
   }
 }
