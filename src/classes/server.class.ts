@@ -11,7 +11,12 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import playDl, { YouTubePlayList } from "play-dl";
+import playDl, {
+  SoundCloudStream,
+  YouTubePlayList,
+  YouTubeStream,
+} from "play-dl";
+import Utils from "./utils.class";
 
 export default class Server {
   queue: string[];
@@ -27,8 +32,8 @@ export default class Server {
     this.player.on(AudioPlayerStatus.Idle, async () => {
       if (!this.connection) return;
 
-      const nextVideo = this.queue.shift();
-      if (!nextVideo) {
+      const nextVideoUrl = this.queue.shift();
+      if (!nextVideoUrl) {
         await this.sendMessage(
           "A fila não têm mais músicas. Vou de fuga",
           true
@@ -36,9 +41,17 @@ export default class Server {
         return;
       }
 
-      const videoInfo = await playDl.video_info(nextVideo);
+      let stream: YouTubeStream | SoundCloudStream;
+      try {
+        stream = await Utils.getStream(nextVideoUrl);
+      } catch (err: any) {
+        await this.sendMessage(err);
+        await this.playNextUrlOnQueue();
+        return;
+      }
+
+      const videoInfo = await playDl.video_info(nextVideoUrl);
       const { title } = videoInfo.video_details;
-      const stream = await playDl.stream_from_info(videoInfo);
       this.sendMessage(`Metendo ${title}`);
       this.player.play(
         createAudioResource(stream.stream, { inputType: stream.type })
@@ -46,9 +59,8 @@ export default class Server {
     });
     this.player.on("error", async (err) => {
       console.error(err.message);
-      console.error(err.resource);
-      await this.sendMessage("Deu ruim", true);
-      this.disconnect();
+      await this.sendMessage("Erro enquanto estava tocando vídeo", true);
+      await this.playNextUrlOnQueue();
     });
   }
 
@@ -119,30 +131,40 @@ export default class Server {
     );
   }
 
+  private async playNextUrlOnQueue() {
+    const nextVideoUrl = this.queue.shift();
+    if (nextVideoUrl) {
+      await this.playYoutubeUrl(nextVideoUrl, undefined, undefined, true);
+    } else {
+      await this.sendMessage("A fila não têm mais músicas. Vou de fuga", true);
+    }
+  }
   async playYoutubeUrl(
     youtubeUrl: string,
     interaction?: ChatInputCommandInteraction<CacheType>,
-    title?: string
+    title?: string,
+    playNow = false
   ) {
     if (!this.connection) return;
 
-    // TODO: validar input
-    if (this.isIdle()) {
-      if (interaction) {
-        await interaction.editReply("Metendo");
-      }
+    if (this.isIdle() || playNow) {
+      //await interaction?.editReply("Metendo");
 
       //const stream = ytdl(input, { filter: "audioonly" });
-      title =
-        title || (await playDl.video_info(youtubeUrl)).video_details.title;
-      const stream = await playDl.stream(youtubeUrl);
+      title = title || (await Utils.getYoutubeVideoInfo(youtubeUrl)).title;
+      let stream: YouTubeStream | SoundCloudStream;
+      try {
+        stream = await Utils.getStream(youtubeUrl);
+      } catch (err: any) {
+        await this.sendMessage(err, false, interaction);
+        await this.playNextUrlOnQueue();
+        return;
+      }
 
       this.player.play(
         createAudioResource(stream.stream, { inputType: stream.type })
       );
-      if (title) {
-        this.sendMessage(`Metendo ${title}`, false, interaction);
-      }
+      this.sendMessage(`Metendo ${title}`, false, interaction);
     } else {
       this.queue.push(youtubeUrl);
       this.sendMessage("Vídeo inserido na fila", false, interaction);
@@ -157,12 +179,9 @@ export default class Server {
 
     const videos = await youtubePlaylist.all_videos();
     if (this.isIdle()) {
-      const nextVideo = videos.shift();
-      if (!nextVideo) return;
-
+      this.queue = videos.map((video) => video.url);
       await this.sendMessage(`Metendo playlist ${title}`, false, interaction);
-      await this.playYoutubeUrl(nextVideo.url, undefined, nextVideo.title);
-      this.queue = this.queue.concat(videos.map((video) => video.url));
+      await this.playNextUrlOnQueue();
     } else {
       this.queue = this.queue.concat(videos.map((video) => video.url));
       this.sendMessage(

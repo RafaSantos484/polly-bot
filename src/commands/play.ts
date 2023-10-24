@@ -3,9 +3,10 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import playDl from "play-dl";
+import playDl, { YouTubeVideo, search } from "play-dl";
 
 import { client } from "..";
+import Utils from "../classes/utils.class";
 
 const command = {
   data: new SlashCommandBuilder()
@@ -96,7 +97,9 @@ const command = {
         );
         break;
       case "search":
-        const searchResult = (await playDl.search(input, { limit: 1 }))[0];
+        //const searchResult = (await playDl.search(input, { limit: 1 }))[0];
+        const searchResult = await Utils.getYoutubeVideoInfo(input, "search");
+
         title = searchResult.title;
         url = searchResult.url;
 
