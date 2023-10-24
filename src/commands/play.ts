@@ -83,10 +83,10 @@ const command = {
         await interaction.editReply("Input inválido");
         return;
       case "yt_video":
-        server.playUrl(input, interaction);
+        server.playSrc(input, "youtubeUrl", interaction);
         break;
       case "sp_track":
-        server.playUrl(input, interaction, undefined, false, "spotify");
+        server.playSrc(input, "spotifyUrl", interaction, undefined, false);
         break;
       case "yt_playlist":
         const playlistInfo = await playDl.playlist_info(input, {
@@ -112,7 +112,7 @@ const command = {
         title = searchResult.title;
         url = searchResult.url;
 
-        server.playUrl(url, interaction, title);
+        server.playSrc(url, "youtubeUrl", interaction, title);
         break;
       default:
         console.log(input, inputType);

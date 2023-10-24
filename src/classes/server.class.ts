@@ -11,19 +11,15 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import playDl, {
-  SoundCloudStream,
-  SpotifyPlaylist,
-  YouTubePlayList,
-  YouTubeStream,
-} from "play-dl";
+import { SoundCloudStream, YouTubePlayList, YouTubeStream } from "play-dl";
 import Utils from "./utils.class";
 import { spotify } from "..";
+import { SpotifyPlaylistTracksSearch } from "./spotify.class";
 
-type UrlType = "youtube" | "spotify";
+type srcType = "youtubeUrl" | "spotifyUrl" | "spotifySearch";
 
 export default class Server {
-  queue: Array<{ url: string; urlType: UrlType; title?: string }>;
+  queue: Array<{ src: string; srcType: srcType; title?: string }>;
   textChannel: TextBasedChannel | null;
   private connection: VoiceConnection | undefined;
   player: AudioPlayer;
@@ -103,8 +99,8 @@ export default class Server {
     connection?.destroy();
   }
 
-  pushToQueue(url: string, urlType: UrlType, title?: string) {
-    this.queue.push({ url, title, urlType });
+  pushToQueue(src: string, srcType: srcType, title?: string) {
+    this.queue.push({ src, title, srcType });
   }
 
   async sendMessage(
@@ -144,41 +140,44 @@ export default class Server {
   private async playNextUrlOnQueue() {
     const nextTrack = this.queue.shift();
     if (nextTrack) {
-      await this.playUrl(
-        nextTrack.url,
+      await this.playSrc(
+        nextTrack.src,
+        nextTrack.srcType,
         undefined,
         nextTrack.title,
-        true,
-        nextTrack.urlType
+        true
       );
     } else {
       await this.sendMessage("A fila não têm mais músicas. Vou de fuga", true);
     }
   }
-  async playUrl(
-    url: string,
+  async playSrc(
+    src: string,
+    srcType: srcType,
     interaction?: ChatInputCommandInteraction<CacheType>,
     title?: string,
-    playNow = false,
-    urlType: UrlType = "youtube"
+    playNow = false
   ) {
     if (!this.connection) return;
 
     if (this.isIdle() || playNow) {
       let stream: YouTubeStream | SoundCloudStream;
       try {
-        if (urlType === "spotify") {
-          const search = await spotify.getTrackSearchFromUrl(url);
+        if (srcType === "spotifyUrl" || srcType === "spotifySearch") {
+          const search =
+            srcType === "spotifySearch"
+              ? src
+              : await spotify.getTrackSearchFromUrl(src);
           const searchResult = await Utils.getYoutubeVideoInfo(
             search,
             "search"
           );
           title = searchResult.title || "";
-          url = searchResult.url;
+          src = searchResult.url;
         }
 
-        title = title || (await Utils.getYoutubeVideoInfo(url)).title;
-        stream = await Utils.getStream(url);
+        title = title || (await Utils.getYoutubeVideoInfo(src)).title;
+        stream = await Utils.getStream(src);
       } catch (err: any) {
         await this.sendMessage(err, false, interaction);
         await this.playNextUrlOnQueue();
@@ -190,37 +189,34 @@ export default class Server {
       );
       this.sendMessage(`Metendo ${title}`, false, interaction);
     } else {
-      this.pushToQueue(url, urlType, title);
+      this.pushToQueue(src, srcType, title);
       this.sendMessage("Vídeo inserido na fila", false, interaction);
     }
   }
 
   async playPlaylist(
-    playlist: YouTubePlayList | SpotifyPlaylist,
+    playlist: YouTubePlayList | SpotifyPlaylistTracksSearch,
     interaction?: ChatInputCommandInteraction<CacheType>
   ) {
     if (!this.connection) return;
 
     //const tracks = await playlist.all_tracks();
-    let title: string | undefined;
+    const title = playlist.title;
     let mappedTracks: any[];
     if (playlist instanceof YouTubePlayList) {
-      title = playlist.title;
       const tracks = await playlist.all_videos();
       mappedTracks = tracks.map((track) => ({
-        url: track.url,
+        src: track.url,
         title: track.title,
-        urlType: "youtube",
+        srcType: "youtubeUrl",
       }));
     } else {
-      title = playlist.name;
-      const tracks = await playlist.all_tracks();
-      mappedTracks = tracks.map((track) => ({
-        url: track.url,
-        title: track.name,
-        urlType: "spotify",
+      mappedTracks = playlist.tracksSearch.map((search) => ({
+        src: search,
+        srcType: "spotifySearch",
       }));
     }
+
     if (this.isIdle()) {
       this.queue = mappedTracks;
       await this.sendMessage(`Metendo playlist ${title}`, false, interaction);

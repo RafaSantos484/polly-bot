@@ -1,8 +1,13 @@
 import axios from "axios";
 import dotenv from "dotenv";
-import { SpotifyPlaylist, SpotifyTrack } from "play-dl";
+import { SpotifyTrack } from "play-dl";
 
 dotenv.config();
+
+export type SpotifyPlaylistTracksSearch = {
+  title: string;
+  tracksSearch: string[];
+};
 
 const Authorization = `Basic ${Buffer.from(
   `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
@@ -74,11 +79,23 @@ export default class Spotify {
         `https://api.spotify.com/v1/playlists/${playlistId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      return new SpotifyPlaylist(
-        res.data,
-        { client_id: "", client_secret: "" },
-        false
-      );
+      const playlistInfo: SpotifyPlaylistTracksSearch = {
+        title: res.data.name,
+        tracksSearch: [],
+      };
+      let search = "";
+      for (const item of res.data.tracks.items) {
+        if (item.track) {
+          search = item.track.name;
+          for (const artist of item.track.artists) search += ` ${artist.name}`;
+
+          playlistInfo.tracksSearch.push(search);
+        }
+        search = "";
+      }
+
+      console.log(playlistInfo);
+      return playlistInfo;
     } catch (err) {
       console.log(err);
       throw "Falha ao tentar obter informações da playlist do Spotify";
