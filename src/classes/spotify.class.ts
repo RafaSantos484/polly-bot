@@ -4,9 +4,9 @@ import { SpotifyTrack } from "play-dl";
 
 dotenv.config();
 
-export type SpotifyPlaylistTracksSearch = {
+export type SpotifyPlaylistBasicInfo = {
   title: string;
-  tracksSearch: string[];
+  tracks: Array<{ id: string; title: string }>;
 };
 
 const Authorization = `Basic ${Buffer.from(
@@ -43,7 +43,7 @@ export default class Spotify {
     return deltaT > 3500e3;
   }
 
-  private getTrackIdFromUrl(trackUrl: string) {
+  getTrackIdFromUrl(trackUrl: string) {
     return new URL(trackUrl).pathname.split("/").pop();
   }
 
@@ -61,7 +61,7 @@ export default class Spotify {
       let search = track.name;
       for (const artist of track.artists) search += ` ${artist.name}`;
 
-      return search;
+      return { search, spotifyId: trackId };
     } catch (err) {
       console.log(err);
       throw "Falha ao tentar obter informações da faixa do Spotify";
@@ -79,19 +79,19 @@ export default class Spotify {
         `https://api.spotify.com/v1/playlists/${playlistId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const playlistInfo: SpotifyPlaylistTracksSearch = {
+      const playlistInfo: SpotifyPlaylistBasicInfo = {
         title: res.data.name,
-        tracksSearch: [],
+        tracks: [],
       };
-      let search = "";
+      let title = "";
       for (const item of res.data.tracks.items) {
         if (item.track) {
-          search = item.track.name;
-          for (const artist of item.track.artists) search += ` ${artist.name}`;
+          title = item.track.name;
+          for (const artist of item.track.artists) title += ` ${artist.name}`;
 
-          playlistInfo.tracksSearch.push(search);
+          playlistInfo.tracks.push({ id: item.track.id, title });
         }
-        search = "";
+        title = "";
       }
 
       return playlistInfo;

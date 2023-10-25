@@ -11,10 +11,15 @@ import {
   ChatInputCommandInteraction,
   CacheType,
 } from "discord.js";
-import { SoundCloudStream, YouTubePlayList, YouTubeStream } from "play-dl";
+import {
+  SoundCloudStream,
+  YouTubePlayList,
+  YouTubeStream,
+  search,
+} from "play-dl";
 import Utils from "./utils.class";
-import { spotify } from "..";
-import { SpotifyPlaylistTracksSearch } from "./spotify.class";
+import { firebase, spotify } from "..";
+import { SpotifyPlaylistBasicInfo } from "./spotify.class";
 
 type SrcType = "youtubeUrl" | "spotifyUrl" | "search";
 type Queue = Array<{ src: string; srcType: SrcType; title?: string }>;
@@ -137,15 +142,42 @@ export default class Server {
     if (this.isIdle() || playNow) {
       let stream: YouTubeStream | SoundCloudStream;
       try {
-        if (srcType === "spotifyUrl" || srcType === "search") {
-          const search =
-            srcType === "search"
-              ? src
-              : await spotify.getTrackSearchFromUrl(src);
-          const searchResult = await Utils.getYoutubeVideoInfo(
-            search,
-            "search"
-          );
+        if (srcType === "spotifyUrl") {
+          const spotifyId = spotify.getTrackIdFromUrl(src);
+          if (!spotifyId) {
+            this.sendMessage(
+              "Falha ao tentar obter Id da track do Spotify",
+              false,
+              interaction
+            );
+            this.playNextUrlOnQueue();
+            return;
+          }
+
+          if (spotifyId in firebase.spotifyToYoutube) {
+            const youtubeInfo = firebase.spotifyToYoutube[spotifyId];
+            title = youtubeInfo.title;
+            src = `https://www.youtube.com/watch?v=${youtubeInfo.youtubeId}`;
+          } else {
+            const { search, spotifyId } = await spotify.getTrackSearchFromUrl(
+              src
+            );
+            const searchResult = await Utils.getYoutubeVideoInfo(
+              search,
+              "search"
+            );
+            if (searchResult.id) {
+              firebase.spotifyToYoutube[spotifyId] = {
+                youtubeId: searchResult.id,
+                title: searchResult.title || "",
+              };
+              await firebase.setSpotifyToYoutubeDoc(firebase.spotifyToYoutube);
+            }
+            title = searchResult.title;
+            src = searchResult.url;
+          }
+        } else if (srcType === "search") {
+          const searchResult = await Utils.getYoutubeVideoInfo(src, "search");
           title = searchResult.title || "";
           src = searchResult.url;
         }
@@ -169,7 +201,7 @@ export default class Server {
   }
 
   async playPlaylist(
-    playlist: YouTubePlayList | SpotifyPlaylistTracksSearch,
+    playlist: YouTubePlayList | SpotifyPlaylistBasicInfo,
     interaction?: ChatInputCommandInteraction<CacheType>
   ) {
     if (!this.connection) return;
@@ -185,9 +217,14 @@ export default class Server {
         srcType: "youtubeUrl",
       }));
     } else {
-      mappedTracks = playlist.tracksSearch.map((search) => ({
+      /*mappedTracks = playlist.tracksSearch.map((search) => ({
         src: search,
         srcType: "search",
+      }));*/
+      mappedTracks = playlist.tracks.map((track) => ({
+        src: `https://open.spotify.com/intl-pt/track/${track.id}`,
+        srcType: "spotifyUrl",
+        title: track.title,
       }));
     }
 

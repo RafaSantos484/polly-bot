@@ -11,6 +11,7 @@ import playCommand from "./commands/play";
 import stopCommand from "./commands/stop";
 import skipCommand from "./commands/skip";
 import Spotify from "./classes/spotify.class";
+import Firebase from "./classes/firebase.class";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ if (!TOKEN || !APP_ID) {
 }
 
 export const spotify = new Spotify();
+export const firebase = new Firebase();
 
 export const client = new Client({
   intents: ["Guilds", "GuildMessages", "MessageContent", "GuildVoiceStates"],
@@ -95,9 +97,10 @@ const rest = new REST().setToken(TOKEN);
     // And of course, make sure you catch and log any errors!
     console.error(error);
   }
-})();
-
-client.login(TOKEN);
+})().then(async () => {
+  await firebase.getSpotifyToYoutubeDoc();
+  client.login(TOKEN);
+});
 
 // Only useful for keeping render server running
 export const app = express();
