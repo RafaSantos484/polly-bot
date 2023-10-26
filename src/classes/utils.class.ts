@@ -1,6 +1,15 @@
 import { search, stream, video_basic_info } from "play-dl";
 
 export default class Utils {
+  static shuffleArray<T>(array: T[]) {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  }
+
   static async getYoutubeVideoInfo(
     query: string,
     inputType: "url" | "search" = "url"

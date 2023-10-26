@@ -202,7 +202,9 @@ export default class Server {
 
   async playPlaylist(
     playlist: YouTubePlayList | SpotifyPlaylistBasicInfo,
-    interaction?: ChatInputCommandInteraction<CacheType>
+    interaction?: ChatInputCommandInteraction<CacheType>,
+    playNow = false,
+    shuffle = false
   ) {
     if (!this.connection) return;
 
@@ -228,7 +230,11 @@ export default class Server {
       }));
     }
 
-    if (this.isIdle()) {
+    if (shuffle) {
+      mappedTracks = Utils.shuffleArray(mappedTracks);
+    }
+
+    if (this.isIdle() || playNow) {
       this.queue = mappedTracks;
       await this.sendMessage(`Metendo playlist ${title}`, false, interaction);
       await this.playNextUrlOnQueue();

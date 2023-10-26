@@ -11,21 +11,29 @@ import Utils from "../classes/utils.class";
 const command = {
   data: new SlashCommandBuilder()
     .setName("meta")
-    .setDescription("Meto(la ele) um vídeo")
+    .setDescription("Meto(la ele) uma faixa ou playlist")
     .addStringOption((option) =>
       option
         .setName("input")
         .setDescription("Link do que eu vou tocar")
         .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option.setName("params").setDescription("Me diga como devo tocar")
     ),
   execute: async (
     interaction: ChatInputCommandInteraction<CacheType>,
     serverId: string
   ) => {
-    let input = interaction.options.get("input")?.value;
+    const input = interaction.options.get("input")?.value;
+    const paramsStr = interaction.options.get("params")?.value;
     if (typeof input !== "string") {
       await interaction.reply("Meta um input válido");
       return;
+    }
+    let params: string[] = [];
+    if (typeof paramsStr === "string") {
+      params = paramsStr.split(" ").map((p) => p.toLowerCase());
     }
 
     if (!interaction.guildId) {
@@ -75,49 +83,71 @@ const command = {
       return;
     }
 
-    let url = "";
-    let title: string | undefined;
-    let inputType = await playDl.validate(input);
-    switch (inputType) {
-      case false:
-        await interaction.editReply("Input inválido");
+    const inputType = await playDl.validate(input);
+    /*const playNow = params.includes("agora");
+    const shuffle =
+      params.includes("embaralhe") || params.includes("embaralhar");*/
+    const hasParam = {
+      playNow: false,
+      shuffle: false,
+    };
+    for (const param of params) {
+      if (param === "agora") hasParam.playNow = true;
+      if (param === "embaralhe" || param === "embaralhar")
+        hasParam.shuffle = true;
+    }
+    if (inputType === false) {
+      await interaction.editReply("Input inválido");
+      return;
+    } else if (inputType === "yt_video") {
+      server.playSrc(
+        input,
+        "youtubeUrl",
+        interaction,
+        undefined,
+        hasParam.playNow
+      );
+    } else if (inputType === "sp_track") {
+      server.playSrc(
+        input,
+        "spotifyUrl",
+        interaction,
+        undefined,
+        hasParam.playNow
+      );
+    } else if (inputType === "yt_playlist") {
+      const playlistInfo = await playDl.playlist_info(input, {
+        incomplete: true,
+      });
+      server.playPlaylist(
+        playlistInfo,
+        interaction,
+        hasParam.playNow,
+        hasParam.shuffle
+      );
+    } else if (inputType === "sp_playlist") {
+      const spotifyPlaylistInfo = await spotify.getPlaylistInfoFromUrl(input);
+      server.playPlaylist(
+        spotifyPlaylistInfo,
+        interaction,
+        hasParam.playNow,
+        hasParam.shuffle
+      );
+    } else if (inputType === "search") {
+      //const searchResult = (await playDl.search(input, { limit: 1 }))[0];
+      let searchResult: YouTubeVideo;
+      try {
+        searchResult = await Utils.getYoutubeVideoInfo(input, "search");
+      } catch (err: any) {
+        await server.sendMessage(err, false, interaction);
         return;
-      case "yt_video":
-        server.playSrc(input, "youtubeUrl", interaction);
-        break;
-      case "sp_track":
-        server.playSrc(input, "spotifyUrl", interaction, undefined, false);
-        break;
-      case "yt_playlist":
-        const playlistInfo = await playDl.playlist_info(input, {
-          incomplete: true,
-        });
+      }
 
-        server.playPlaylist(playlistInfo, interaction);
-        break;
-      case "sp_playlist":
-        const spotifyPlaylistInfo = await spotify.getPlaylistInfoFromUrl(input);
-        server.playPlaylist(spotifyPlaylistInfo, interaction);
-        break;
-      case "search":
-        //const searchResult = (await playDl.search(input, { limit: 1 }))[0];
-        let searchResult: YouTubeVideo;
-        try {
-          searchResult = await Utils.getYoutubeVideoInfo(input, "search");
-        } catch (err: any) {
-          await server.sendMessage(err, false, interaction);
-          return;
-        }
-
-        title = searchResult.title;
-        url = searchResult.url;
-
-        server.playSrc(url, "youtubeUrl", interaction, title);
-        break;
-      default:
-        console.log(input, inputType);
-        await interaction.editReply("Não consigo processar esse tipo de input");
-        return;
+      const { url, title } = searchResult;
+      server.playSrc(url, "youtubeUrl", interaction, title, hasParam.playNow);
+    } else {
+      console.log(input, inputType);
+      await interaction.editReply("Não consigo processar esse tipo de input");
     }
   },
 };

@@ -52,6 +52,7 @@ export default class Firebase {
   }
   async setSpotifyToYoutubeDoc(data: SpotifyToYoutube) {
     const dbRef = doc(this.firestore, "IdConverters/SpotifyToYoutube");
+    // TODO: TENTAR SUBSTITUIR setDoc POR updateDoc
     await setDoc(dbRef, data);
   }
 }
